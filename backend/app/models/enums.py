@@ -1,0 +1,41 @@
+import enum
+
+
+class UserRoleName(str, enum.Enum):
+    CUSTOMER = "CUSTOMER"
+    ADMIN = "ADMIN"
+
+
+class ProductStatus(str, enum.Enum):
+    DRAFT = "DRAFT"
+    ACTIVE = "ACTIVE"
+    ARCHIVED = "ARCHIVED"
+
+
+class OrderStatus(str, enum.Enum):
+    PENDING_PAYMENT = "PENDING_PAYMENT"
+    PAYMENT_SUBMITTED = "PAYMENT_SUBMITTED"
+    PAYMENT_VERIFICATION_PENDING = "PAYMENT_VERIFICATION_PENDING"
+    PAID = "PAID"
+    PROCESSING = "PROCESSING"
+    SHIPPED = "SHIPPED"
+    DELIVERED = "DELIVERED"
+    CANCELLED = "CANCELLED"
+    PAYMENT_DECLINED = "PAYMENT_DECLINED"
+    PAYMENT_EXPIRED = "PAYMENT_EXPIRED"
+
+
+class PaymentStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    SUBMITTED = "SUBMITTED"
+    VERIFICATION_PENDING = "VERIFICATION_PENDING"
+    PAID = "PAID"
+    DECLINED = "DECLINED"
+    EXPIRED = "EXPIRED"
+    CANCELLED = "CANCELLED"
+
+
+class ReservationStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    RELEASED = "RELEASED"
+    CONSUMED = "CONSUMED"
