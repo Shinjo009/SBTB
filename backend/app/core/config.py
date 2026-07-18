@@ -1,3 +1,4 @@
+import re
 from functools import lru_cache
 
 from pydantic import Field, field_validator
@@ -41,6 +42,20 @@ class Settings(BaseSettings):
 
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
+
+    @field_validator("database_url")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        # Hosting providers expose sync-style URLs; the app uses the async driver.
+        if value.startswith("postgres://"):
+            value = "postgresql+asyncpg://" + value[len("postgres://") :]
+        elif value.startswith("postgresql://") and "+asyncpg" not in value:
+            value = "postgresql+asyncpg://" + value[len("postgresql://") :]
+        # asyncpg rejects libpq's "sslmode" query parameter; drop it (use internal URLs).
+        if "sslmode=" in value:
+            value = re.sub(r"[?&]sslmode=[^&]*", "", value)
+            value = re.sub(r"\?&", "?", value).rstrip("?&")
+        return value
 
     @field_validator("cookie_samesite")
     @classmethod

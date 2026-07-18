@@ -1,0 +1,50 @@
+databases:
+  - name: sbtb-db
+    plan: free
+    databaseName: sbtb
+    user: sbtb
+
+services:
+  - type: web
+    name: sbtb-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/v1/health
+    dockerCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CSRF_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sbtb-db
+          property: connectionString
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAMESITE
+        value: none
+      - key: STORAGE_BACKEND
+        value: local
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USE_TLS
+        value: "true"
+      - key: SMTP_EMAIL
+        value: sbtb.vasudharanade@gmail.com
+      # Set these three in the Render dashboard (not committed):
+      - key: SMTP_APP_PASSWORD
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: BACKEND_URL
+        sync: false
