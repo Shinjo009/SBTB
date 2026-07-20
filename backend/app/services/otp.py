@@ -69,7 +69,8 @@ class OTPService:
             await self._set(key, str(current), ttl)
             return current
 
-    async def issue(self, *, email: str, purpose: str = "verify") -> None:
+    async def issue(self, *, email: str, purpose: str = "verify") -> str | None:
+        """Issue an OTP. Returns the code when email could not be delivered (fallback)."""
         resend_key = self._resend_key(purpose, email)
         if await self._exists(resend_key):
             raise ValueError("Please wait before requesting another code")
@@ -83,17 +84,17 @@ class OTPService:
             f"<p style='font-size:28px;letter-spacing:8px;font-weight:bold;'>{otp}</p>"
             f"<p>This code expires in {self.settings.otp_expire_minutes} minutes.</p>",
         )
-        try:
-            get_email_service().send(
-                to=email,
-                subject="Your Scrunchies By The Bunch verification code",
-                html=html,
-                text=f"Your verification code is {otp}",
-            )
-        except Exception:
-            logger.exception("OTP email failed")
-            if not self.settings.is_production:
-                logger.warning("DEV OTP for %s: %s", email, otp)
+        sent = get_email_service().send(
+            to=email,
+            subject="Your Scrunchies By The Bunch verification code",
+            html=html,
+            text=f"Your verification code is {otp}",
+        )
+        if sent:
+            return None
+        # Render free tier blocks SMTP; return code so signup can still complete.
+        logger.warning("OTP email not delivered for %s — returning fallback code", email)
+        return otp
 
     async def verify(self, *, email: str, otp: str, purpose: str = "verify") -> bool:
         attempts_key = self._attempts_key(purpose, email)

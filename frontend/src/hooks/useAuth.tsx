@@ -19,7 +19,7 @@ interface AuthContextValue {
   isLoading: boolean
   isAdmin: boolean
   login: (data: LoginInput) => Promise<void>
-  signup: (data: SignupInput) => Promise<void>
+  signup: (data: SignupInput) => Promise<{ message: string; otp?: string | null }>
   logout: () => Promise<void>
   refreshMe: () => Promise<User | null>
 }
@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signup = useCallback(async (data: SignupInput) => {
-    await authApi.signup(data)
+    return authApi.signup(data)
   }, [])
 
   const logout = useCallback(async () => {

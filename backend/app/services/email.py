@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+import httpx
+
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -11,15 +13,20 @@ logger = logging.getLogger(__name__)
 
 class EmailService(ABC):
     @abstractmethod
-    def send(self, *, to: str, subject: str, html: str, text: str | None = None) -> None: ...
+    def send(self, *, to: str, subject: str, html: str, text: str | None = None) -> bool:
+        """Send email. Returns True if delivered to provider, False if skipped."""
 
 
 class SMTPEmailService(EmailService):
-    def send(self, *, to: str, subject: str, html: str, text: str | None = None) -> None:
+    def send(self, *, to: str, subject: str, html: str, text: str | None = None) -> bool:
         settings = get_settings()
-        if not settings.smtp_app_password:
+        if not settings.smtp_app_password or settings.smtp_app_password.strip().lower() in {
+            "temp",
+            "pending",
+            "changeme",
+        }:
             logger.warning("SMTP password not configured; skipping email to %s", to)
-            return
+            return False
         message = MIMEMultipart("alternative")
         message["Subject"] = subject
         message["From"] = settings.smtp_email
@@ -32,12 +39,48 @@ class SMTPEmailService(EmailService):
                     server.starttls()
                 server.login(settings.smtp_email, settings.smtp_app_password)
                 server.sendmail(settings.smtp_email, [to], message.as_string())
+            return True
         except Exception:
-            logger.exception("Failed to send email to %s", to)
-            raise
+            logger.exception("Failed to send email to %s via SMTP", to)
+            return False
+
+
+class ResendEmailService(EmailService):
+    """HTTPS email API — works on Render free tier (SMTP ports are blocked)."""
+
+    def send(self, *, to: str, subject: str, html: str, text: str | None = None) -> bool:
+        settings = get_settings()
+        payload = {
+            "from": settings.resend_from_email,
+            "to": [to],
+            "subject": subject,
+            "html": html,
+        }
+        if text:
+            payload["text"] = text
+        try:
+            response = httpx.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {settings.resend_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=30,
+            )
+            if response.status_code >= 400:
+                logger.error("Resend failed (%s): %s", response.status_code, response.text)
+                return False
+            return True
+        except Exception:
+            logger.exception("Failed to send email to %s via Resend", to)
+            return False
 
 
 def get_email_service() -> EmailService:
+    settings = get_settings()
+    if settings.resend_api_key.strip():
+        return ResendEmailService()
     return SMTPEmailService()
 
 

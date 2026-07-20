@@ -11,6 +11,7 @@ class ORMModel(BaseModel):
 
 class MessageOut(BaseModel):
     message: str
+    otp: str | None = None
 
 
 class Page(BaseModel, Generic[T]):

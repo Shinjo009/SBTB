@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     smtp_app_password: str = ""
     smtp_use_tls: bool = True
 
+    # HTTPS email (works on Render free; SMTP ports 25/465/587 are blocked)
+    resend_api_key: str = ""
+    resend_from_email: str = "Scrunchies By The Bunch <onboarding@resend.dev>"
+
     storage_backend: str = "local"
     local_upload_dir: str = "./.uploads"
     s3_endpoint: str = ""

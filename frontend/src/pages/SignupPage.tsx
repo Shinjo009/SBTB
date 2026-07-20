@@ -20,9 +20,14 @@ export default function SignupPage() {
 
   const onSubmit = async (data: SignupInput) => {
     try {
-      await signup(data)
-      toast('Check your email for the OTP', 'success')
-      navigate('/verify-otp', { state: { email: data.email } })
+      const res = await signup(data)
+      if (res.otp) {
+        toast('Use the code shown on the next screen', 'success')
+        navigate('/verify-otp', { state: { email: data.email, otp: res.otp } })
+      } else {
+        toast('Check your email for the OTP', 'success')
+        navigate('/verify-otp', { state: { email: data.email } })
+      }
     } catch (err) {
       toast(getErrorMessage(err), 'error')
     }

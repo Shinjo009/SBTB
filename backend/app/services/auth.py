@@ -34,7 +34,8 @@ class AuthService:
                 self.db.add(Role(name=name))
         await self.db.commit()
 
-    async def signup(self, *, full_name: str, email: str, password: str) -> User:
+    async def signup(self, *, full_name: str, email: str, password: str) -> str | None:
+        """Create account and issue OTP. Returns fallback OTP when email cannot be sent."""
         email_norm = email.lower().strip()
         existing = await self.db.scalar(select(User).where(User.email == email_norm))
         if existing:
@@ -51,8 +52,7 @@ class AuthService:
         await self.db.flush()
         self.db.add(UserRole(user_id=user.id, role_id=role.id))
         await self.db.commit()
-        await OTPService().issue(email=email_norm, purpose="verify")
-        return user
+        return await OTPService().issue(email=email_norm, purpose="verify")
 
     async def verify_email(self, *, email: str, otp: str) -> User:
         email_norm = email.lower().strip()
