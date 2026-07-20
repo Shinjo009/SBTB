@@ -4,16 +4,21 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 class SignupIn(BaseModel):
     full_name: str = Field(min_length=2, max_length=120)
     email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    confirm_password: str = Field(min_length=8, max_length=128)
     phone: str | None = Field(default=None, max_length=20)
 
+    @field_validator("confirm_password")
+    @classmethod
+    def passwords_match(cls, value: str, info) -> str:
+        if "password" in info.data and value != info.data["password"]:
+            raise ValueError("Passwords do not match")
+        return value
 
-class RequestOTPIn(BaseModel):
+
+class LoginIn(BaseModel):
     email: EmailStr
-
-
-class VerifyOTPIn(BaseModel):
-    email: EmailStr
-    otp: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+    password: str = Field(min_length=1, max_length=128)
 
 
 class RefreshIn(BaseModel):
@@ -23,13 +28,14 @@ class RefreshIn(BaseModel):
 class CreateUserIn(BaseModel):
     full_name: str = Field(min_length=2, max_length=120)
     email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
     phone: str | None = Field(default=None, max_length=20)
-    is_admin: bool = False
 
 
 class InviteTeamIn(BaseModel):
     full_name: str = Field(min_length=2, max_length=120)
     email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
     role: str = "MANAGER"
 
     @field_validator("role")

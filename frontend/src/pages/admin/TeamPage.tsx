@@ -16,6 +16,7 @@ export default function AdminTeamPage() {
   const queryClient = useQueryClient()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [role, setRole] = useState<'ADMIN' | 'MANAGER'>('MANAGER')
 
   const { data: team, isLoading } = useQuery({
@@ -28,12 +29,14 @@ export default function AdminTeamPage() {
       adminApi.inviteTeam({
         full_name: fullName.trim(),
         email: email.trim().toLowerCase(),
+        password,
         role,
       }),
     onSuccess: (res) => {
-      toast(res.message || 'Team member invited', 'success')
+      toast(res.message || 'Team member created', 'success')
       setFullName('')
       setEmail('')
+      setPassword('')
       setRole('MANAGER')
       queryClient.invalidateQueries({ queryKey: ['admin', 'team'] })
     },
@@ -47,15 +50,15 @@ export default function AdminTeamPage() {
         <h1 className="font-display text-2xl font-semibold">Team</h1>
       </div>
       <p className="mt-1 text-sm text-ink/60">
-        Invite a second Admin or a Manager. They sign in with email OTP like everyone else.
+        Create another Admin or Manager with email + password.
       </p>
 
       <form
-        className="mt-6 grid gap-3 rounded-2xl border border-rose/15 bg-white p-4 sm:grid-cols-4"
+        className="mt-6 grid gap-3 rounded-2xl border border-rose/15 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5"
         onSubmit={(e) => {
           e.preventDefault()
-          if (!fullName.trim() || !email.trim()) {
-            toast('Name and email are required', 'error')
+          if (!fullName.trim() || !email.trim() || password.length < 8) {
+            toast('Name, email, and password (8+ chars) are required', 'error')
             return
           }
           inviteMutation.mutate()
@@ -63,6 +66,7 @@ export default function AdminTeamPage() {
       >
         <Input label="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
         <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         <div className="space-y-1.5">
           <label className="block text-sm font-medium text-ink/80">Role</label>
           <select
@@ -76,7 +80,7 @@ export default function AdminTeamPage() {
         </div>
         <div className="flex items-end">
           <Button type="submit" loading={inviteMutation.isPending} className="w-full">
-            Invite
+            Create
           </Button>
         </div>
       </form>

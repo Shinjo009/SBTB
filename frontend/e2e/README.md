@@ -2,7 +2,7 @@
 
 Critical journey (run manually or with Playwright once browsers are installed):
 
-1. Signup → OTP (check SMTP or server logs in development)
+1. Signup with email + password → signed in
 2. Login → browse shop → add to cart
 3. Checkout with saved address → UPI payment screen (server `expires_at`)
 4. Submit UTR → verification pending

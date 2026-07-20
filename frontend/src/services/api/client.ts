@@ -61,8 +61,8 @@ apiClient.interceptors.response.use(
       error.response?.status === 401 &&
       config &&
       !config._retry &&
-      !config.url?.includes('/auth/request-otp') &&
-      !config.url?.includes('/auth/verify-otp') &&
+      !config.url?.includes('/auth/login') &&
+      !config.url?.includes('/auth/signup') &&
       !config.url?.includes('/auth/refresh')
     ) {
       config._retry = true

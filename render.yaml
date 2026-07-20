@@ -45,11 +45,14 @@ services:
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_ENABLED
-        value: "true"
+        value: "false"
       - key: BOOTSTRAP_ADMIN_EMAIL
-        sync: false
+        value: sbtb.vasudharanade@gmail.com
       - key: BOOTSTRAP_ADMIN_NAME
         value: Store Admin
+      # Set a strong password (≥8 chars) in the Render dashboard:
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
       - key: FRONTEND_URL
         sync: false
       - key: CORS_ORIGINS

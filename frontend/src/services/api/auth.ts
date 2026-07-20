@@ -2,18 +2,22 @@ import { apiClient, clearTokens, setTokens } from './client'
 import type { AuthResponse, MessageResponse, TokenPairResponse, User } from '@/types'
 
 export const authApi = {
-  signup: (data: { full_name: string; email: string; phone?: string }) =>
-    apiClient.post<MessageResponse>('/auth/signup', data).then((r) => r.data),
+  signup: async (data: {
+    full_name: string
+    email: string
+    password: string
+    confirm_password: string
+    phone?: string
+  }) => {
+    const res = await apiClient.post<TokenPairResponse>('/auth/signup', data).then((r) => r.data)
+    setTokens(res.access_token, res.refresh_token)
+    return res
+  },
 
-  requestOtp: (email: string) =>
-    apiClient.post<MessageResponse>('/auth/request-otp', { email }).then((r) => r.data),
-
-  verifyOtp: async (email: string, otp: string) => {
-    const data = await apiClient
-      .post<TokenPairResponse>('/auth/verify-otp', { email, otp })
-      .then((r) => r.data)
-    setTokens(data.access_token, data.refresh_token)
-    return data
+  login: async (data: { email: string; password: string }) => {
+    const res = await apiClient.post<TokenPairResponse>('/auth/login', data).then((r) => r.data)
+    setTokens(res.access_token, res.refresh_token)
+    return res
   },
 
   logout: async () => {

@@ -1,13 +1,22 @@
 import { z } from 'zod'
 
-export const requestOtpSchema = z.object({
+export const loginSchema = z.object({
   email: z.email('Enter a valid email'),
+  password: z.string().min(1, 'Password is required'),
 })
 
-export const verifyOtpSchema = z.object({
-  email: z.email('Enter a valid email'),
-  otp: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
-})
+export const signupSchema = z
+  .object({
+    full_name: z.string().min(2, 'Name is required'),
+    email: z.email('Enter a valid email'),
+    phone: z.string().optional(),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    confirm_password: z.string().min(8, 'Confirm your password'),
+  })
+  .refine((data) => data.password === data.confirm_password, {
+    message: 'Passwords do not match',
+    path: ['confirm_password'],
+  })
 
 export const addressSchema = z.object({
   full_name: z.string().min(2, 'Name is required'),
@@ -27,7 +36,7 @@ export const paymentSubmitSchema = z.object({
   customer_note: z.string().optional(),
 })
 
-export type RequestOtpInput = z.infer<typeof requestOtpSchema>
-export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>
+export type LoginInput = z.infer<typeof loginSchema>
+export type SignupInput = z.infer<typeof signupSchema>
 export type AddressInput = z.infer<typeof addressSchema>
 export type PaymentSubmitInput = z.infer<typeof paymentSubmitSchema>

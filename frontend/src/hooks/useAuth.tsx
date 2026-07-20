@@ -16,9 +16,14 @@ interface AuthContextValue {
   isLoading: boolean
   isAdmin: boolean
   isStaff: boolean
-  signup: (data: { full_name: string; email: string; phone?: string }) => Promise<void>
-  requestOtp: (email: string) => Promise<void>
-  verifyOtp: (email: string, otp: string) => Promise<User>
+  signup: (data: {
+    full_name: string
+    email: string
+    password: string
+    confirm_password: string
+    phone?: string
+  }) => Promise<User>
+  login: (data: { email: string; password: string }) => Promise<User>
   logout: () => Promise<void>
   refreshMe: () => Promise<User | null>
 }
@@ -49,18 +54,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshMe().finally(() => setIsLoading(false))
   }, [refreshMe])
 
-  const signup = useCallback(async (data: { full_name: string; email: string; phone?: string }) => {
-    await authApi.signup(data)
+  const signup = useCallback(async (data: {
+    full_name: string
+    email: string
+    password: string
+    confirm_password: string
+    phone?: string
+  }) => {
+    const res = await authApi.signup(data)
+    setUser(res.user)
+    return res.user
   }, [])
 
-  const requestOtp = useCallback(async (email: string) => {
-    await authApi.requestOtp(email)
-  }, [])
-
-  const verifyOtp = useCallback(async (email: string, otp: string) => {
-    const data = await authApi.verifyOtp(email, otp)
-    setUser(data.user)
-    return data.user
+  const login = useCallback(async (data: { email: string; password: string }) => {
+    const res = await authApi.login(data)
+    setUser(res.user)
+    return res.user
   }, [])
 
   const logout = useCallback(async () => {
@@ -82,12 +91,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       isStaff,
       signup,
-      requestOtp,
-      verifyOtp,
+      login,
       logout,
       refreshMe,
     }),
-    [user, isLoading, isAdmin, isStaff, signup, requestOtp, verifyOtp, logout, refreshMe],
+    [user, isLoading, isAdmin, isStaff, signup, login, logout, refreshMe],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

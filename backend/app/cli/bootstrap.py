@@ -9,12 +9,12 @@ from app.models.settings import StoreSettings
 from app.services.auth import AuthService
 
 
-async def create_admin(email: str, full_name: str) -> None:
+async def create_admin(email: str, full_name: str, password: str) -> None:
     async with AsyncSessionLocal() as db:
-        user = await AuthService(db).create_user(
+        user = await AuthService(db).ensure_admin(
             email=email,
             full_name=full_name,
-            is_admin=True,
+            password=password,
         )
         settings = await db.scalar(select(StoreSettings).limit(1))
         if not settings:
@@ -91,11 +91,15 @@ def main() -> None:
     admin_parser = sub.add_parser("create-admin")
     admin_parser.add_argument("--email", required=True)
     admin_parser.add_argument("--name", default="Store Admin")
+    admin_parser.add_argument("--password", required=True)
     sub.add_parser("seed")
     args = parser.parse_args()
     if args.command == "create-admin":
+        if len(args.password) < 8:
+            print("Password must be at least 8 characters")
+            sys.exit(1)
         try:
-            asyncio.run(create_admin(args.email, args.name))
+            asyncio.run(create_admin(args.email, args.name, args.password))
         except ValueError as exc:
             print(str(exc))
             sys.exit(1)

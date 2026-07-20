@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
+from app.core.security import hash_password
 from app.models.enums import UserRoleName
 from app.models.user import Role, User, UserRole
 
@@ -52,7 +53,7 @@ async def customer(db_session: AsyncSession) -> User:
     user = User(
         email="customer@example.com",
         full_name="Test Customer",
-        password_hash=None,
+        password_hash=hash_password("password123"),
         email_verified=True,
         is_active=True,
     )

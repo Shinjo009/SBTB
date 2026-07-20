@@ -6,7 +6,7 @@ Stack:
 
 - **Frontend:** React, TypeScript, Vite, Tailwind CSS, React Router, TanStack Query, React Hook Form, Zod, Axios, Framer Motion
 - **Backend:** FastAPI, SQLAlchemy, Alembic, Pydantic, PostgreSQL
-- **Infra:** Redis (OTP/rate limits), Celery (payment expiry + async work), S3-compatible or local uploads, Docker, Nginx
+- **Infra:** Redis (rate limits), Celery (payment expiry + async work), S3-compatible or local uploads, Docker, Nginx
 
 ```
 Internet → Nginx → React (static) + FastAPI
@@ -137,20 +137,27 @@ Vite proxies `/api` and `/uploads` to the backend.
 3. Put it in `.env` as `SMTP_APP_PASSWORD=`
 4. Keep `SMTP_HOST=smtp.gmail.com` and `SMTP_PORT=587`
 
-Emails are sent only from the backend. In development, if SMTP is unset, OTP codes are logged server-side (never in production).
+Emails are sent only from the backend when `EMAIL_ENABLED=true` (order notifications, etc.). Login uses email + password — no OTP.
 
 ---
 
 ## 6. First admin (no public admin signup)
 
+Set env vars (or pass flags):
+
 ```bash
 cd backend
 source .venv/bin/activate
 export $(grep -v '^#' ../.env | xargs)
-python -m app.cli.bootstrap create-admin --email admin@example.com --name "Admin"
+python -m app.cli.bootstrap create-admin \
+  --email sbtb.vasudharanade@gmail.com \
+  --name "Store Admin" \
+  --password "your-secure-password"
 ```
 
-Then log in on the storefront and open `/admin`.
+On Render, set `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_NAME`, and `BOOTSTRAP_ADMIN_PASSWORD` — the start script creates/updates this admin on each deploy.
+
+Then sign in on the storefront with that email + password and open `/admin`.
 
 Configure **Settings → UPI ID / QR / payment instructions** before taking real orders. Do not invent business payment details in code.
 
@@ -158,9 +165,9 @@ Configure **Settings → UPI ID / QR / payment instructions** before taking real
 
 ## 7. Customer journey
 
-Splash → Welcome → Signup/Login → Email OTP → Home/Shop → Product → Cart → Checkout → Address → UPI payment (20‑minute **server** window) → Submit UTR → Admin verifies → Processing → Order history
+Splash → Welcome → Signup/Login (email + password) → Home/Shop → Product → Cart → Checkout → Address → UPI payment (20‑minute **server** window) → Submit UTR → Admin verifies → Processing → Order history
 
-Guest browsing is allowed. Cart and checkout require a verified account.
+Guest browsing is allowed. Cart and checkout require an account.
 
 ---
 
@@ -253,10 +260,10 @@ Use [`infra/nginx/nginx.conf`](infra/nginx/nginx.conf) as a starting point:
 ## 13. Backups and monitoring
 
 - Nightly `pg_dump` of PostgreSQL (or managed automated backups)
-- Redis is ephemeral (OTP/rate limits); no durable business data there
+- Redis is ephemeral (rate limits); no durable business data there
 - Keep object storage versioning/backups for product images
 - Hit `/api/v1/health` from uptime monitoring
-- Ship structured logs; never log passwords, OTPs, tokens, or SMTP secrets
+- Ship structured logs; never log passwords, tokens, or SMTP secrets
 - Review admin audit logs for payment approvals/declines
 
 ---
@@ -282,10 +289,10 @@ docker-compose.yml Local/prod-ish stack
 ## 15. Security highlights
 
 - Argon2id passwords
-- HttpOnly session cookies + CSRF double-submit for mutations
-- Redis-backed OTP hashes with expiry/attempt limits
+- JWT access + refresh tokens (Bearer) with session rotation
+- Rate-limited signup/login
 - Server-authoritative pricing and inventory
-- RBAC (`CUSTOMER` / `ADMIN`) enforced in FastAPI
+- RBAC (`CUSTOMER` / `MANAGER` / `ADMIN`) enforced in FastAPI
 - Upload MIME/size validation
 - Generic auth error messages
 - No secrets in the React bundle

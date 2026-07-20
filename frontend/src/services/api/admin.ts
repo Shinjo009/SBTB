@@ -69,7 +69,7 @@ export const adminApi = {
   getCustomers: () =>
     apiClient.get<AdminCustomer[]>('/admin/customers').then((r) => r.data),
 
-  createCustomer: (data: { full_name: string; email: string; phone?: string; is_admin?: boolean }) =>
+  createCustomer: (data: { full_name: string; email: string; phone?: string; password: string }) =>
     apiClient.post<AdminCustomer>('/admin/customers', data).then((r) => r.data),
 
   getTeam: () =>
@@ -79,7 +79,7 @@ export const adminApi = {
       )
       .then((r) => r.data),
 
-  inviteTeam: (data: { full_name: string; email: string; role: 'ADMIN' | 'MANAGER' }) =>
+  inviteTeam: (data: { full_name: string; email: string; password: string; role: 'ADMIN' | 'MANAGER' }) =>
     apiClient
       .post<{
         id: string

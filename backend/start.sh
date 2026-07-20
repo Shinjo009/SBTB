@@ -4,12 +4,19 @@ set -e
 echo "==> Running database migrations..."
 alembic upgrade head
 
-if [ -n "${BOOTSTRAP_ADMIN_EMAIL:-}" ]; then
-  echo "==> Ensuring admin user exists..."
+ADMIN_EMAIL="${BOOTSTRAP_ADMIN_EMAIL:-sbtb.vasudharanade@gmail.com}"
+ADMIN_NAME="${BOOTSTRAP_ADMIN_NAME:-Store Admin}"
+ADMIN_PASSWORD="${BOOTSTRAP_ADMIN_PASSWORD:-}"
+
+if [ -n "$ADMIN_PASSWORD" ]; then
+  echo "==> Ensuring admin user exists: $ADMIN_EMAIL"
   python -m app.cli.bootstrap create-admin \
-    --email "$BOOTSTRAP_ADMIN_EMAIL" \
-    --name "${BOOTSTRAP_ADMIN_NAME:-Store Admin}" || true
+    --email "$ADMIN_EMAIL" \
+    --name "$ADMIN_NAME" \
+    --password "$ADMIN_PASSWORD" || true
   python -m app.cli.bootstrap seed || true
+else
+  echo "==> Skipping admin bootstrap (set BOOTSTRAP_ADMIN_PASSWORD to enable)"
 fi
 
 echo "==> Starting API server on port ${PORT:-8000}..."

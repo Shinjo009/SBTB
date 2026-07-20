@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 import logging
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -9,16 +9,15 @@ from app.api.deps import user_role_names
 from app.core.config import get_settings
 from app.core.security import (
     create_access_token,
-    generate_otp,
     generate_token,
     hash_password,
     hash_token,
+    needs_rehash,
     verify_password,
 )
 from app.models.enums import UserRoleName
-from app.models.user import AuthSession, LoginOTP, Role, User, UserRole
+from app.models.user import AuthSession, Role, User, UserRole
 from app.schemas.auth import TokenPairOut, UserOut
-from app.services.email import branded_email, get_email_service
 
 logger = logging.getLogger(__name__)
 
@@ -39,16 +38,26 @@ class AuthService:
                 self.db.add(Role(name=name))
         await self.db.commit()
 
+    async def _load_user(self, user_id: str) -> User:
+        result = await self.db.execute(
+            select(User)
+            .options(selectinload(User.roles).selectinload(UserRole.role))
+            .where(User.id == user_id)
+        )
+        return result.scalar_one()
+
     async def create_user(
         self,
         *,
         email: str,
         full_name: str,
+        password: str,
         phone: str | None = None,
         role: str = UserRoleName.CUSTOMER.value,
         is_admin: bool = False,
-        email_verified: bool = True,
     ) -> User:
+        if len(password) < 8:
+            raise ValueError("Password must be at least 8 characters")
         email_norm = email.lower().strip()
         existing = await self.db.scalar(select(User).where(User.email == email_norm))
         if existing:
@@ -59,10 +68,10 @@ class AuthService:
             email=email_norm,
             full_name=full_name.strip(),
             phone=(phone or "").strip() or None,
-            password_hash=None,
+            password_hash=hash_password(password),
             is_active=True,
-            email_verified=email_verified,
-            email_verified_at=now if email_verified else None,
+            email_verified=True,
+            email_verified_at=now,
         )
         self.db.add(user)
         await self.db.flush()
@@ -76,152 +85,96 @@ class AuthService:
             if role_row:
                 self.db.add(UserRole(user_id=user.id, role_id=role_row.id))
         await self.db.commit()
+        return await self._load_user(user.id)
+
+    async def ensure_admin(self, *, email: str, full_name: str, password: str) -> User:
+        """Create or update the primary admin account (password from env on each boot)."""
+        await self.ensure_roles()
+        email_norm = email.lower().strip()
         result = await self.db.execute(
             select(User)
             .options(selectinload(User.roles).selectinload(UserRole.role))
-            .where(User.id == user.id)
+            .where(User.email == email_norm)
         )
-        return result.scalar_one()
-
-    async def signup(self, *, full_name: str, email: str, phone: str | None = None) -> None:
-        email_norm = email.lower().strip()
-        existing = await self.db.scalar(select(User).where(User.email == email_norm))
-        if existing:
-            if not existing.is_active:
-                raise ValueError("This account is disabled. Contact support.")
-            if existing.email_verified:
-                raise ValueError("An account with this email already exists. Please sign in.")
-            existing.full_name = full_name.strip()
-            if phone:
-                existing.phone = phone.strip()
-            await self.db.commit()
+        user = result.scalar_one_or_none()
+        now = datetime.now(UTC)
+        if user:
+            user.full_name = full_name.strip()
+            user.password_hash = hash_password(password)
+            user.is_active = True
+            user.email_verified = True
+            user.email_verified_at = user.email_verified_at or now
         else:
-            await self.create_user(
+            user = User(
                 email=email_norm,
-                full_name=full_name,
-                phone=phone,
-                email_verified=False,
+                full_name=full_name.strip(),
+                password_hash=hash_password(password),
+                is_active=True,
+                email_verified=True,
+                email_verified_at=now,
             )
-        await self.request_login_otp(email=email_norm, require_existing=True)
+            self.db.add(user)
+            await self.db.flush()
 
-    async def invite_team_member(self, *, full_name: str, email: str, role: str) -> User:
-        role_norm = role.strip().upper()
-        if role_norm not in {UserRoleName.ADMIN.value, UserRoleName.MANAGER.value}:
-            raise ValueError("Role must be ADMIN or MANAGER")
-        user = await self.create_user(
+        admin_role = await self.db.scalar(select(Role).where(Role.name == UserRoleName.ADMIN.value))
+        customer_role = await self.db.scalar(select(Role).where(Role.name == UserRoleName.CUSTOMER.value))
+        existing_role_ids = {ur.role_id for ur in user.roles}
+        if customer_role and customer_role.id not in existing_role_ids:
+            self.db.add(UserRole(user_id=user.id, role_id=customer_role.id))
+        if admin_role and admin_role.id not in existing_role_ids:
+            self.db.add(UserRole(user_id=user.id, role_id=admin_role.id))
+        await self.db.commit()
+        return await self._load_user(user.id)
+
+    async def signup(
+        self, *, full_name: str, email: str, password: str, phone: str | None = None
+    ) -> User:
+        return await self.create_user(
             email=email,
             full_name=full_name,
-            role=role_norm,
-            is_admin=role_norm == UserRoleName.ADMIN.value,
-            email_verified=True,
+            password=password,
+            phone=phone,
+            role=UserRoleName.CUSTOMER.value,
         )
-        # Send a login code so they can access immediately
-        try:
-            await self.request_login_otp(email=user.email, require_existing=True)
-        except ValueError:
-            pass
-        return user
 
-    async def request_login_otp(self, *, email: str, require_existing: bool = False) -> None:
+    async def authenticate(self, *, email: str, password: str) -> User:
         email_norm = email.lower().strip()
-        user = await self.db.scalar(
-            select(User).where(User.email == email_norm, User.is_active.is_(True))
-        )
-        if not user:
-            if require_existing:
-                raise ValueError("Unable to send verification code")
-            return
-
-        latest = await self.db.scalar(
-            select(LoginOTP)
-            .where(LoginOTP.email == email_norm, LoginOTP.consumed_at.is_(None))
-            .order_by(LoginOTP.created_at.desc())
-            .limit(1)
-        )
-        if latest:
-            created = latest.created_at
-            if created.tzinfo is None:
-                created = created.replace(tzinfo=UTC)
-            if (datetime.now(UTC) - created).total_seconds() < 60:
-                raise ValueError("Please wait before requesting another code")
-
-        code = generate_otp(6)
-        self.db.add(
-            LoginOTP(
-                email=email_norm,
-                code_hash=hash_password(code),
-                attempts=0,
-                expires_at=datetime.now(UTC) + timedelta(minutes=self.settings.otp_expire_minutes),
-            )
-        )
-        await self.db.commit()
-
-        html = branded_email(
-            "Your login code",
-            f"<p>Your Scrunchies By The Bunch login code is:</p>"
-            f"<p style='font-size:28px;letter-spacing:8px;font-weight:bold;'>{code}</p>"
-            f"<p>This code expires in {self.settings.otp_expire_minutes} minutes.</p>",
-        )
-
-        should_email = self.settings.email_enabled
-        sent = False
-        if should_email:
-            sent = get_email_service().send(
-                to=email_norm,
-                subject="Your Scrunchies By The Bunch login code",
-                html=html,
-                text=f"Your login code is {code}",
-            )
-        if not sent:
-            logger.warning("OTP email not sent. Login code for %s: %s", email_norm, code)
-
-    async def verify_login_otp(
-        self, *, email: str, otp: str, ip: str | None = None, ua: str | None = None
-    ) -> tuple[User, TokenPairOut]:
-        email_norm = email.lower().strip()
-        user_result = await self.db.execute(
+        result = await self.db.execute(
             select(User)
             .options(selectinload(User.roles).selectinload(UserRole.role))
             .where(User.email == email_norm, User.is_active.is_(True))
         )
-        user = user_result.scalar_one_or_none()
-        if not user:
-            raise ValueError("Invalid or expired verification code")
-
-        otp_row = await self.db.scalar(
-            select(LoginOTP)
-            .where(LoginOTP.email == email_norm, LoginOTP.consumed_at.is_(None))
-            .order_by(LoginOTP.created_at.desc())
-            .limit(1)
-        )
-        if not otp_row:
-            raise ValueError("Invalid or expired verification code")
-        expires_at = otp_row.expires_at
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=UTC)
-        if expires_at < datetime.now(UTC):
-            raise ValueError("Invalid or expired verification code")
-        if otp_row.attempts >= 5:
-            raise ValueError("Too many verification attempts. Request a new code.")
-
-        if not verify_password(otp, otp_row.code_hash):
-            otp_row.attempts += 1
+        user = result.scalar_one_or_none()
+        if not user or not user.password_hash or not verify_password(password, user.password_hash):
+            raise ValueError("Invalid email or password")
+        if needs_rehash(user.password_hash):
+            user.password_hash = hash_password(password)
             await self.db.commit()
-            raise ValueError("Invalid or expired verification code")
+        return user
 
-        otp_row.consumed_at = datetime.now(UTC)
-        await self.db.execute(
-            delete(LoginOTP).where(LoginOTP.email == email_norm, LoginOTP.id != otp_row.id)
-        )
+    async def login(
+        self, *, email: str, password: str, ip: str | None = None, ua: str | None = None
+    ) -> TokenPairOut:
+        user = await self.authenticate(email=email, password=password)
         user.last_login = datetime.now(UTC)
-        if not user.email_verified:
-            user.email_verified = True
-            user.email_verified_at = datetime.now(UTC)
         await self.db.flush()
-
         tokens = await self.issue_tokens(user, ip=ip, ua=ua)
         await self.db.commit()
-        return user, tokens
+        return tokens
+
+    async def invite_team_member(
+        self, *, full_name: str, email: str, password: str, role: str
+    ) -> User:
+        role_norm = role.strip().upper()
+        if role_norm not in {UserRoleName.ADMIN.value, UserRoleName.MANAGER.value}:
+            raise ValueError("Role must be ADMIN or MANAGER")
+        return await self.create_user(
+            email=email,
+            full_name=full_name,
+            password=password,
+            role=role_norm,
+            is_admin=role_norm == UserRoleName.ADMIN.value,
+        )
 
     async def issue_tokens(self, user: User, *, ip: str | None, ua: str | None) -> TokenPairOut:
         refresh = generate_token()

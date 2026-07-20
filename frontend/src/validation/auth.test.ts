@@ -1,19 +1,36 @@
 import { describe, expect, it } from 'vitest'
-import { requestOtpSchema, verifyOtpSchema } from './auth'
+import { loginSchema, signupSchema } from './auth'
 
-describe('auth validation', () => {
-  it('accepts valid email for OTP request', () => {
-    const result = requestOtpSchema.safeParse({ email: 'aisha@example.com' })
+describe('auth schemas', () => {
+  it('accepts valid login', () => {
+    const result = loginSchema.safeParse({
+      email: 'aisha@example.com',
+      password: 'password123',
+    })
     expect(result.success).toBe(true)
   })
 
   it('rejects invalid email', () => {
-    const result = requestOtpSchema.safeParse({ email: 'not-an-email' })
+    const result = loginSchema.safeParse({ email: 'not-an-email', password: 'x' })
     expect(result.success).toBe(false)
   })
 
-  it('requires 6-digit otp', () => {
-    expect(verifyOtpSchema.safeParse({ email: 'a@b.com', otp: '12345' }).success).toBe(false)
-    expect(verifyOtpSchema.safeParse({ email: 'a@b.com', otp: '123456' }).success).toBe(true)
+  it('requires matching passwords on signup', () => {
+    expect(
+      signupSchema.safeParse({
+        full_name: 'Aisha',
+        email: 'a@b.com',
+        password: 'password123',
+        confirm_password: 'password999',
+      }).success,
+    ).toBe(false)
+    expect(
+      signupSchema.safeParse({
+        full_name: 'Aisha',
+        email: 'a@b.com',
+        password: 'password123',
+        confirm_password: 'password123',
+      }).success,
+    ).toBe(true)
   })
 })

@@ -16,6 +16,7 @@ export default function AdminCustomersPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [password, setPassword] = useState('')
 
   const { data: customers, isLoading } = useQuery({
     queryKey: ['admin', 'customers'],
@@ -28,12 +29,14 @@ export default function AdminCustomersPage() {
         full_name: fullName.trim(),
         email: email.trim().toLowerCase(),
         phone: phone.trim() || undefined,
+        password,
       }),
     onSuccess: () => {
-      toast('Customer created — they can sign in with an email OTP', 'success')
+      toast('Customer created — they can sign in with email and password', 'success')
       setFullName('')
       setEmail('')
       setPhone('')
+      setPassword('')
       queryClient.invalidateQueries({ queryKey: ['admin', 'customers'] })
     },
     onError: (err) => toast(getErrorMessage(err), 'error'),
@@ -43,15 +46,15 @@ export default function AdminCustomersPage() {
     <div>
       <h1 className="font-display text-2xl font-semibold">Customers</h1>
       <p className="mt-1 text-sm text-ink/60">
-        Create users here. They sign in with a 6-digit email code (no password).
+        Create a customer with email and password so they can sign in.
       </p>
 
       <form
-        className="mt-6 grid gap-3 rounded-2xl border border-rose/15 bg-white p-4 sm:grid-cols-4"
+        className="mt-6 grid gap-3 rounded-2xl border border-rose/15 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5"
         onSubmit={(e) => {
           e.preventDefault()
-          if (!fullName.trim() || !email.trim()) {
-            toast('Name and email are required', 'error')
+          if (!fullName.trim() || !email.trim() || password.length < 8) {
+            toast('Name, email, and password (8+ chars) are required', 'error')
             return
           }
           createMutation.mutate()
@@ -60,6 +63,7 @@ export default function AdminCustomersPage() {
         <Input label="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
         <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <Input label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         <div className="flex items-end">
           <Button type="submit" loading={createMutation.isPending} className="w-full">
             Add customer

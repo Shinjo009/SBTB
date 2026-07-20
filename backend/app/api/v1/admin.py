@@ -257,6 +257,7 @@ async def create_customer(
         user = await AuthService(db).create_user(
             email=payload.email,
             full_name=payload.full_name,
+            password=payload.password,
             phone=payload.phone,
             is_admin=False,
         )
@@ -320,6 +321,7 @@ async def invite_team(
         user = await AuthService(db).invite_team_member(
             full_name=payload.full_name,
             email=payload.email,
+            password=payload.password,
             role=payload.role,
         )
     except ValueError as exc:
@@ -331,7 +333,7 @@ async def invite_team(
         "roles": user_role_names(user),
         "is_active": user.is_active,
         "created_at": user.created_at,
-        "message": "Team member invited. A login code was emailed if email is configured.",
+        "message": "Team member created. They can sign in with email and password.",
     }
 
 
