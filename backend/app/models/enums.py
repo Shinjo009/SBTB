@@ -3,6 +3,7 @@ import enum
 
 class UserRoleName(str, enum.Enum):
     CUSTOMER = "CUSTOMER"
+    MANAGER = "MANAGER"
     ADMIN = "ADMIN"
 
 

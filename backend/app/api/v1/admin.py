@@ -6,24 +6,24 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import require_admin, require_csrf
+from app.api.deps import require_admin, require_csrf, require_staff, user_role_names
 from app.db.session import get_db
 from app.models.enums import OrderStatus, PaymentStatus
 from app.models.inventory import Inventory
 from app.models.order import Order
 from app.models.payment import Payment
 from app.models.user import User
-from app.schemas.auth import CreateUserIn
+from app.schemas.auth import CreateUserIn, InviteTeamIn
 from app.schemas.catalog import CategoryIn, CategoryOut, ProductIn, ProductOut
 from app.schemas.common import MessageOut, Page
 from app.services.catalog import CatalogService
 from app.services.payments import ManualUPIPaymentService
 from app.services.storage import get_storage
-router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_csrf), Depends(require_admin)])
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_csrf), Depends(require_staff)])
 
 
 @router.get("/dashboard")
-async def dashboard(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+async def dashboard(db: AsyncSession = Depends(get_db), _: User = Depends(require_staff)):
     total_orders = await db.scalar(select(func.count()).select_from(Order)) or 0
     revenue = await db.scalar(
         select(func.coalesce(func.sum(Order.total), 0)).where(
@@ -62,13 +62,13 @@ async def dashboard(db: AsyncSession = Depends(get_db), _: User = Depends(requir
 
 
 @router.get("/categories", response_model=list[CategoryOut])
-async def admin_categories(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+async def admin_categories(db: AsyncSession = Depends(get_db), _: User = Depends(require_staff)):
     return await CatalogService(db).list_categories(active_only=False)
 
 
 @router.post("/categories", response_model=CategoryOut)
 async def create_category(
-    payload: CategoryIn, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
+    payload: CategoryIn, db: AsyncSession = Depends(get_db), _: User = Depends(require_staff)
 ):
     return await CatalogService(db).create_category(payload)
 
@@ -78,7 +78,7 @@ async def update_category(
     category_id: str,
     payload: CategoryIn,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_staff),
 ):
     try:
         return await CatalogService(db).update_category(category_id, payload)
@@ -88,7 +88,7 @@ async def update_category(
 
 @router.delete("/categories/{category_id}", response_model=MessageOut)
 async def delete_category(
-    category_id: str, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
+    category_id: str, db: AsyncSession = Depends(get_db), _: User = Depends(require_staff)
 ):
     try:
         await CatalogService(db).delete_category(category_id)
@@ -103,7 +103,7 @@ async def admin_products(
     page_size: int = Query(20, ge=1, le=100),
     q: str | None = None,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_staff),
 ):
     items, total = await CatalogService(db).list_products(page=page, page_size=page_size, q=q, admin=True)
     return Page(items=items, total=total, page=page, page_size=page_size, pages=max(1, math.ceil(total / page_size)) if total else 0)
@@ -111,7 +111,7 @@ async def admin_products(
 
 @router.post("/products", response_model=ProductOut)
 async def create_product(
-    payload: ProductIn, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
+    payload: ProductIn, db: AsyncSession = Depends(get_db), _: User = Depends(require_staff)
 ):
     return await CatalogService(db).create_product(payload)
 
@@ -121,7 +121,7 @@ async def update_product(
     product_id: str,
     payload: ProductIn,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_staff),
 ):
     try:
         return await CatalogService(db).update_product(product_id, payload)
@@ -136,7 +136,7 @@ async def upload_product_image(
     alt_text: str | None = Form(default=None),
     is_primary: bool = Form(default=False),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_staff),
 ):
     key, url, width, height = await get_storage().save_image(file, folder="products")
     try:
@@ -155,7 +155,7 @@ async def upload_product_image(
 
 
 @router.get("/payments/pending")
-async def pending_payments(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+async def pending_payments(db: AsyncSession = Depends(get_db), _: User = Depends(require_staff)):
     result = await db.execute(
         select(Payment)
         .options(
@@ -195,7 +195,7 @@ class PaymentDecision(BaseModel):
 @router.post("/payments/{payment_id}/approve", response_model=MessageOut)
 async def approve_payment(
     payment_id: str,
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_staff),
     db: AsyncSession = Depends(get_db),
 ):
     payment = await db.get(Payment, payment_id)
@@ -212,7 +212,7 @@ async def approve_payment(
 async def decline_payment(
     payment_id: str,
     payload: PaymentDecision,
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_staff),
     db: AsyncSession = Depends(get_db),
 ):
     payment = await db.get(Payment, payment_id)
@@ -226,7 +226,7 @@ async def decline_payment(
 
 
 @router.get("/customers")
-async def list_customers(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+async def list_customers(db: AsyncSession = Depends(get_db), _: User = Depends(require_staff)):
     users = await db.scalars(select(User).order_by(User.created_at.desc()).limit(200))
     out = []
     for user in users:
@@ -249,7 +249,7 @@ async def list_customers(db: AsyncSession = Depends(get_db), _: User = Depends(r
 async def create_customer(
     payload: CreateUserIn,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_staff),
 ):
     from app.services.auth import AuthService
 
@@ -258,7 +258,7 @@ async def create_customer(
             email=payload.email,
             full_name=payload.full_name,
             phone=payload.phone,
-            is_admin=payload.is_admin,
+            is_admin=False,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -274,11 +274,72 @@ async def create_customer(
     }
 
 
+@router.get("/team")
+async def list_team(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+    from app.models.enums import UserRoleName
+    from app.models.user import Role, UserRole
+
+    staff_roles = await db.scalars(
+        select(Role).where(Role.name.in_([UserRoleName.ADMIN.value, UserRoleName.MANAGER.value]))
+    )
+    role_ids = [r.id for r in staff_roles]
+    if not role_ids:
+        return []
+    user_ids = await db.scalars(select(UserRole.user_id).where(UserRole.role_id.in_(role_ids)))
+    ids = list({uid for uid in user_ids})
+    if not ids:
+        return []
+    users = await db.scalars(
+        select(User)
+        .options(selectinload(User.roles).selectinload(UserRole.role))
+        .where(User.id.in_(ids))
+        .order_by(User.created_at.desc())
+    )
+    return [
+        {
+            "id": u.id,
+            "full_name": u.full_name,
+            "email": u.email,
+            "roles": user_role_names(u),
+            "is_active": u.is_active,
+            "created_at": u.created_at,
+        }
+        for u in users
+    ]
+
+
+@router.post("/team")
+async def invite_team(
+    payload: InviteTeamIn,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    from app.services.auth import AuthService
+
+    try:
+        user = await AuthService(db).invite_team_member(
+            full_name=payload.full_name,
+            email=payload.email,
+            role=payload.role,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "id": user.id,
+        "full_name": user.full_name,
+        "email": user.email,
+        "roles": user_role_names(user),
+        "is_active": user.is_active,
+        "created_at": user.created_at,
+        "message": "Team member invited. A login code was emailed if email is configured.",
+    }
+
+
 @router.get("/orders")
 async def admin_orders(
     status_filter: str | None = Query(default=None, alias="status"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_staff),
 ):
     stmt = (
         select(Order)

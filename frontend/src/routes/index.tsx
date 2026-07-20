@@ -9,6 +9,7 @@ import { ProtectedRoute, AdminRoute, GuestRoute } from './ProtectedRoute'
 const SplashPage = lazy(() => import('@/pages/SplashPage'))
 const WelcomePage = lazy(() => import('@/pages/WelcomePage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
+const SignupPage = lazy(() => import('@/pages/SignupPage'))
 const HomePage = lazy(() => import('@/pages/HomePage'))
 const ShopPage = lazy(() => import('@/pages/ShopPage'))
 const ProductDetailPage = lazy(() => import('@/pages/ProductDetailPage'))
@@ -28,6 +29,7 @@ const AdminCategoriesPage = lazy(() => import('@/pages/admin/CategoriesPage'))
 const AdminOrdersPage = lazy(() => import('@/pages/admin/OrdersPage'))
 const AdminPendingPaymentsPage = lazy(() => import('@/pages/admin/PendingPaymentsPage'))
 const AdminCustomersPage = lazy(() => import('@/pages/admin/CustomersPage'))
+const AdminTeamPage = lazy(() => import('@/pages/admin/TeamPage'))
 const AdminSettingsPage = lazy(() => import('@/pages/admin/SettingsPage'))
 
 function PageLoader() {
@@ -50,6 +52,7 @@ export const router = createBrowserRouter([
     element: <AuthLayout />,
     children: [
       { path: '/login', element: <SuspenseWrap><GuestRoute><LoginPage /></GuestRoute></SuspenseWrap> },
+      { path: '/signup', element: <SuspenseWrap><GuestRoute><SignupPage /></GuestRoute></SuspenseWrap> },
     ],
   },
 
@@ -81,6 +84,7 @@ export const router = createBrowserRouter([
       { path: 'orders', element: <SuspenseWrap><AdminOrdersPage /></SuspenseWrap> },
       { path: 'payments', element: <SuspenseWrap><AdminPendingPaymentsPage /></SuspenseWrap> },
       { path: 'customers', element: <SuspenseWrap><AdminCustomersPage /></SuspenseWrap> },
+      { path: 'team', element: <SuspenseWrap><AdminTeamPage /></SuspenseWrap> },
       { path: 'settings', element: <SuspenseWrap><AdminSettingsPage /></SuspenseWrap> },
     ],
   },

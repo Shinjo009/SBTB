@@ -15,6 +15,8 @@ interface AuthContextValue {
   user: User | null
   isLoading: boolean
   isAdmin: boolean
+  isStaff: boolean
+  signup: (data: { full_name: string; email: string; phone?: string }) => Promise<void>
   requestOtp: (email: string) => Promise<void>
   verifyOtp: (email: string, otp: string) => Promise<User>
   logout: () => Promise<void>
@@ -47,6 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshMe().finally(() => setIsLoading(false))
   }, [refreshMe])
 
+  const signup = useCallback(async (data: { full_name: string; email: string; phone?: string }) => {
+    await authApi.signup(data)
+  }, [])
+
   const requestOtp = useCallback(async (email: string) => {
     await authApi.requestOtp(email)
   }, [])
@@ -66,17 +72,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
+  const isAdmin = Boolean(user?.roles.includes('ADMIN'))
+  const isStaff = Boolean(user?.roles.some((r) => r === 'ADMIN' || r === 'MANAGER'))
+
   const value = useMemo(
     () => ({
       user,
       isLoading,
-      isAdmin: Boolean(user?.roles.includes('ADMIN')),
+      isAdmin,
+      isStaff,
+      signup,
       requestOtp,
       verifyOtp,
       logout,
       refreshMe,
     }),
-    [user, isLoading, requestOtp, verifyOtp, logout, refreshMe],
+    [user, isLoading, isAdmin, isStaff, signup, requestOtp, verifyOtp, logout, refreshMe],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

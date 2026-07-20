@@ -7,7 +7,7 @@ import { cartApi } from '@/services/api/cart'
 import { useAuth } from '@/hooks/useAuth'
 
 export function Header() {
-  const { user, logout } = useAuth()
+  const { user, logout, isStaff } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -36,7 +36,7 @@ export function Header() {
           <Link to="/shop" className="text-sm text-ink/70 hover:text-ink">Shop</Link>
           <Link to="/orders" className="text-sm text-ink/70 hover:text-ink">Orders</Link>
           <Link to="/profile" className="text-sm text-ink/70 hover:text-ink">Profile</Link>
-          {user?.roles.includes('ADMIN') && (
+          {isStaff && (
             <Link to="/admin" className="text-sm text-rose-dark hover:text-rose">Admin</Link>
           )}
         </nav>
@@ -98,7 +98,7 @@ export function Header() {
             <Link to="/shop" onClick={() => setMenuOpen(false)} className="rounded-lg px-2 py-2 text-sm hover:bg-rose-light/20">Shop</Link>
             <Link to="/orders" onClick={() => setMenuOpen(false)} className="rounded-lg px-2 py-2 text-sm hover:bg-rose-light/20">Orders</Link>
             <Link to="/profile" onClick={() => setMenuOpen(false)} className="rounded-lg px-2 py-2 text-sm hover:bg-rose-light/20">Profile</Link>
-            {user?.roles.includes('ADMIN') && (
+            {isStaff && (
               <Link to="/admin" onClick={() => setMenuOpen(false)} className="rounded-lg px-2 py-2 text-sm text-rose-dark hover:bg-rose-light/20">Admin</Link>
             )}
             {user ? (

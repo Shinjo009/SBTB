@@ -10,23 +10,26 @@ import {
   ArrowLeft,
   LogOut,
   User,
+  Shield,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 
 const nav = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/admin/products', icon: Package, label: 'Products' },
-  { to: '/admin/categories', icon: FolderTree, label: 'Categories' },
-  { to: '/admin/orders', icon: ShoppingCart, label: 'Orders' },
-  { to: '/admin/payments', icon: CreditCard, label: 'Payments' },
-  { to: '/admin/customers', icon: Users, label: 'Customers' },
-  { to: '/admin/settings', icon: Settings, label: 'Settings' },
+  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, adminOnly: false },
+  { to: '/admin/products', icon: Package, label: 'Products', adminOnly: false },
+  { to: '/admin/categories', icon: FolderTree, label: 'Categories', adminOnly: false },
+  { to: '/admin/orders', icon: ShoppingCart, label: 'Orders', adminOnly: false },
+  { to: '/admin/payments', icon: CreditCard, label: 'Payments', adminOnly: false },
+  { to: '/admin/customers', icon: Users, label: 'Customers', adminOnly: false },
+  { to: '/admin/team', icon: Shield, label: 'Team', adminOnly: true },
+  { to: '/admin/settings', icon: Settings, label: 'Settings', adminOnly: true },
 ]
 
 export function AdminLayout() {
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin } = useAuth()
   const navigate = useNavigate()
+  const links = nav.filter((item) => !item.adminOnly || isAdmin)
 
   const handleLogout = async () => {
     await logout()
@@ -37,11 +40,11 @@ export function AdminLayout() {
     <div className="flex min-h-dvh bg-ivory">
       <aside className="hidden w-56 shrink-0 border-r border-rose/15 bg-white p-4 md:block">
         <div className="mb-6">
-          <p className="font-display text-lg font-semibold">Admin</p>
+          <p className="font-display text-lg font-semibold">{isAdmin ? 'Admin' : 'Manager'}</p>
           <p className="text-xs text-ink/50">{user?.full_name}</p>
         </div>
         <nav className="space-y-1">
-          {nav.map(({ to, icon: Icon, label, end }) => (
+          {links.map(({ to, icon: Icon, label, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -78,14 +81,14 @@ export function AdminLayout() {
       <div className="flex-1">
         <header className="border-b border-rose/15 bg-white px-4 py-3 md:hidden">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-display font-semibold">Admin</p>
+            <p className="font-display font-semibold">{isAdmin ? 'Admin' : 'Manager'}</p>
             <div className="flex items-center gap-3 text-sm">
               <Link to="/profile" className="text-ink/60">Profile</Link>
               <button type="button" onClick={handleLogout} className="text-ink/60">Logout</button>
             </div>
           </div>
           <nav className="mt-2 flex gap-2 overflow-x-auto pb-1 text-xs">
-            {nav.map(({ to, label, end }) => (
+            {links.map(({ to, label, end }) => (
               <NavLink
                 key={to}
                 to={to}

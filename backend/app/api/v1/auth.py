@@ -6,12 +6,34 @@ from app.api.deps import get_current_user, user_role_names
 from app.core.rate_limit import rate_limit
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.auth import AuthMeOut, RefreshIn, RequestOTPIn, TokenPairOut, UserOut, VerifyOTPIn
+from app.schemas.auth import (
+    AuthMeOut,
+    RefreshIn,
+    RequestOTPIn,
+    SignupIn,
+    TokenPairOut,
+    UserOut,
+    VerifyOTPIn,
+)
 from app.schemas.common import MessageOut
 from app.services.auth import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+@router.post("/signup", response_model=MessageOut)
+async def signup(payload: SignupIn, request: Request, db: AsyncSession = Depends(get_db)) -> MessageOut:
+    await rate_limit(request, key="signup", limit=15, window_seconds=3600)
+    try:
+        await AuthService(db).signup(
+            full_name=payload.full_name,
+            email=payload.email,
+            phone=payload.phone,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return MessageOut(message="Account created. Check your email for a 6-digit verification code.")
 
 
 @router.post("/request-otp", response_model=MessageOut)

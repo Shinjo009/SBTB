@@ -29,7 +29,11 @@ class AuthService:
         self.settings = get_settings()
 
     async def ensure_roles(self) -> None:
-        for name in (UserRoleName.CUSTOMER.value, UserRoleName.ADMIN.value):
+        for name in (
+            UserRoleName.CUSTOMER.value,
+            UserRoleName.MANAGER.value,
+            UserRoleName.ADMIN.value,
+        ):
             exists = await self.db.scalar(select(Role).where(Role.name == name))
             if not exists:
                 self.db.add(Role(name=name))
@@ -43,26 +47,30 @@ class AuthService:
         phone: str | None = None,
         role: str = UserRoleName.CUSTOMER.value,
         is_admin: bool = False,
+        email_verified: bool = True,
     ) -> User:
         email_norm = email.lower().strip()
         existing = await self.db.scalar(select(User).where(User.email == email_norm))
         if existing:
             raise ValueError("A user with this email already exists")
         await self.ensure_roles()
+        now = datetime.now(UTC)
         user = User(
             email=email_norm,
             full_name=full_name.strip(),
             phone=(phone or "").strip() or None,
             password_hash=None,
             is_active=True,
-            email_verified=True,
-            email_verified_at=datetime.now(UTC),
+            email_verified=email_verified,
+            email_verified_at=now if email_verified else None,
         )
         self.db.add(user)
         await self.db.flush()
         roles_to_assign = [UserRoleName.CUSTOMER.value]
         if is_admin or role == UserRoleName.ADMIN.value:
             roles_to_assign.append(UserRoleName.ADMIN.value)
+        elif role == UserRoleName.MANAGER.value:
+            roles_to_assign.append(UserRoleName.MANAGER.value)
         for role_name in roles_to_assign:
             role_row = await self.db.scalar(select(Role).where(Role.name == role_name))
             if role_row:
@@ -75,13 +83,53 @@ class AuthService:
         )
         return result.scalar_one()
 
-    async def request_login_otp(self, *, email: str) -> None:
+    async def signup(self, *, full_name: str, email: str, phone: str | None = None) -> None:
+        email_norm = email.lower().strip()
+        existing = await self.db.scalar(select(User).where(User.email == email_norm))
+        if existing:
+            if not existing.is_active:
+                raise ValueError("This account is disabled. Contact support.")
+            if existing.email_verified:
+                raise ValueError("An account with this email already exists. Please sign in.")
+            existing.full_name = full_name.strip()
+            if phone:
+                existing.phone = phone.strip()
+            await self.db.commit()
+        else:
+            await self.create_user(
+                email=email_norm,
+                full_name=full_name,
+                phone=phone,
+                email_verified=False,
+            )
+        await self.request_login_otp(email=email_norm, require_existing=True)
+
+    async def invite_team_member(self, *, full_name: str, email: str, role: str) -> User:
+        role_norm = role.strip().upper()
+        if role_norm not in {UserRoleName.ADMIN.value, UserRoleName.MANAGER.value}:
+            raise ValueError("Role must be ADMIN or MANAGER")
+        user = await self.create_user(
+            email=email,
+            full_name=full_name,
+            role=role_norm,
+            is_admin=role_norm == UserRoleName.ADMIN.value,
+            email_verified=True,
+        )
+        # Send a login code so they can access immediately
+        try:
+            await self.request_login_otp(email=user.email, require_existing=True)
+        except ValueError:
+            pass
+        return user
+
+    async def request_login_otp(self, *, email: str, require_existing: bool = False) -> None:
         email_norm = email.lower().strip()
         user = await self.db.scalar(
             select(User).where(User.email == email_norm, User.is_active.is_(True))
         )
-        # Do not reveal whether the email exists
         if not user:
+            if require_existing:
+                raise ValueError("Unable to send verification code")
             return
 
         latest = await self.db.scalar(

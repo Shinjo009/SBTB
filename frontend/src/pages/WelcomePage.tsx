@@ -104,9 +104,9 @@ export default function WelcomePage() {
         </p>
 
         <div className="mt-5 w-full shrink-0">
-          <Link to="/home" className="mb-3 block w-full">
+          <Link to="/signup" className="mb-3 block w-full">
             <Button size="lg" className="!block w-full py-2.5 shadow-lg shadow-rose/30">
-              Explore Collection
+              Create account
             </Button>
           </Link>
           <Link to="/login" className="block w-full">
@@ -115,11 +115,15 @@ export default function WelcomePage() {
               size="lg"
               className="!block w-full border-2 border-rose/35 bg-white/85 py-2.5"
             >
-              Sign In with email code
+              Sign In
             </Button>
           </Link>
           <p className="mt-3 text-center text-xs text-ink/55">
-            Need an account? Ask the store admin to invite your email.
+            Or{' '}
+            <Link to="/home" className="font-semibold text-rose-dark underline-offset-2 hover:underline">
+              browse the shop
+            </Link>{' '}
+            first
           </p>
         </div>
       </motion.div>

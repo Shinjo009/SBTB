@@ -22,7 +22,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, isAdmin } = useAuth()
+  const { user, isLoading, isStaff } = useAuth()
   const location = useLocation()
 
   if (isLoading) {
@@ -37,7 +37,7 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
   }
 
-  if (!isAdmin) {
+  if (!isStaff) {
     return <Navigate to="/home" replace />
   }
 

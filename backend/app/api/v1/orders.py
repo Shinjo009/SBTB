@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_verified_user, require_admin, require_csrf, user_role_names
+from app.api.deps import get_verified_user, require_csrf, require_staff, user_role_names
 from app.db.session import get_db
 from app.models.enums import UserRoleName
 from app.models.order import Order
@@ -119,11 +119,11 @@ async def get_order(
     return await _serialize_order(order, db)
 
 
-@router.patch("/{order_id}/status", dependencies=[Depends(require_csrf), Depends(require_admin)])
+@router.patch("/{order_id}/status", dependencies=[Depends(require_csrf), Depends(require_staff)])
 async def update_order_status(
     order_id: str,
     payload: dict,
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_staff),
     db: AsyncSession = Depends(get_db),
 ):
     from app.models.enums import OrderStatus

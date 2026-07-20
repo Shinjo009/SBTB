@@ -8,15 +8,16 @@ import { getErrorMessage, useAuth } from '@/hooks/useAuth'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { cn, prefersReducedMotion } from '@/lib/utils'
 
-export default function LoginPage() {
-  useDocumentTitle('Sign In')
-  const { requestOtp, verifyOtp } = useAuth()
+export default function SignupPage() {
+  useDocumentTitle('Sign Up')
+  const { signup, verifyOtp } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
 
-  const [step, setStep] = useState<'email' | 'code'>('email')
+  const [step, setStep] = useState<'form' | 'code'>('form')
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
-  const [emailError, setEmailError] = useState('')
+  const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [digits, setDigits] = useState(['', '', '', '', '', ''])
   const [countdown, setCountdown] = useState(0)
@@ -30,31 +31,31 @@ export default function LoginPage() {
 
   const otp = digits.join('')
 
-  const sendCode = async (targetEmail: string) => {
+  const onFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const name = fullName.trim()
+    const mail = email.trim().toLowerCase()
+    if (name.length < 2) {
+      toast('Enter your full name', 'error')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
+      toast('Enter a valid email', 'error')
+      return
+    }
     setLoading(true)
     try {
-      await requestOtp(targetEmail)
-      toast('If that email is registered, a login code was sent', 'success')
+      await signup({ full_name: name, email: mail, phone: phone.trim() || undefined })
+      setEmail(mail)
       setStep('code')
       setCountdown(60)
       setDigits(['', '', '', '', '', ''])
+      toast('Check your email for the verification code', 'success')
     } catch (err) {
       toast(getErrorMessage(err), 'error')
     } finally {
       setLoading(false)
     }
-  }
-
-  const onEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const value = email.trim().toLowerCase()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      setEmailError('Enter a valid email')
-      return
-    }
-    setEmailError('')
-    setEmail(value)
-    await sendCode(value)
   }
 
   const handleChange = (index: number, value: string) => {
@@ -89,9 +90,9 @@ export default function LoginPage() {
     }
     setLoading(true)
     try {
-      const user = await verifyOtp(email, otp)
-      toast('Welcome back!', 'success')
-      navigate(user.roles.some((r) => r === 'ADMIN' || r === 'MANAGER') ? '/admin' : '/home')
+      await verifyOtp(email, otp)
+      toast('Welcome! You’re signed in.', 'success')
+      navigate('/home')
     } catch (err) {
       toast(getErrorMessage(err), 'error')
     } finally {
@@ -99,29 +100,20 @@ export default function LoginPage() {
     }
   }
 
-  if (step === 'email') {
+  if (step === 'form') {
     return (
       <div>
-        <h1 className="font-display text-2xl font-semibold">Welcome back</h1>
-        <p className="mt-1 text-sm text-ink/60">We’ll email you a 6-digit login code</p>
-        <form onSubmit={onEmailSubmit} className="mt-6 space-y-4">
-          <Input
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={emailError}
-            autoComplete="email"
-          />
-          <Button type="submit" loading={loading} className="w-full">
-            Send login code
-          </Button>
+        <h1 className="font-display text-2xl font-semibold">Create account</h1>
+        <p className="mt-1 text-sm text-ink/60">We’ll email you a 6-digit code — no password needed</p>
+        <form onSubmit={onFormSubmit} className="mt-6 space-y-4">
+          <Input label="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" />
+          <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+          <Input label="Phone (optional)" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" />
+          <Button type="submit" loading={loading} className="w-full">Send verification code</Button>
         </form>
-        <p className="mt-4 text-center text-sm text-ink/55">
-          New here?{' '}
-          <Link to="/signup" className="font-semibold text-rose-dark hover:underline">
-            Create an account
-          </Link>
+        <p className="mt-4 text-center text-sm text-ink/60">
+          Already have an account?{' '}
+          <Link to="/login" className="text-rose-dark hover:underline">Sign in</Link>
         </p>
       </div>
     )
@@ -129,7 +121,7 @@ export default function LoginPage() {
 
   return (
     <div className="text-center">
-      <h1 className="font-display text-2xl font-semibold">Enter login code</h1>
+      <h1 className="font-display text-2xl font-semibold">Verify your email</h1>
       <p className="mt-2 text-sm text-ink/60">We sent a 6-digit code to {email}</p>
 
       <div className="mt-8 flex justify-center gap-2" onPaste={handlePaste}>
@@ -157,25 +149,30 @@ export default function LoginPage() {
       </div>
 
       <Button onClick={handleVerify} loading={loading} className="mt-8 w-full">
-        Verify & sign in
+        Verify & continue
       </Button>
 
       <p className="mt-4 text-sm text-ink/60">
         {countdown > 0 ? (
           <>Resend in {countdown}s</>
         ) : (
-          <button type="button" onClick={() => sendCode(email)} className="text-rose-dark hover:underline">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await signup({ full_name: fullName.trim(), email, phone: phone.trim() || undefined })
+                setCountdown(60)
+                toast('Code sent again', 'success')
+              } catch (err) {
+                toast(getErrorMessage(err), 'error')
+              }
+            }}
+            className="text-rose-dark hover:underline"
+          >
             Resend code
           </button>
         )}
       </p>
-      <button
-        type="button"
-        className="mt-3 text-sm text-ink/50 hover:underline"
-        onClick={() => setStep('email')}
-      >
-        Use a different email
-      </button>
     </div>
   )
 }

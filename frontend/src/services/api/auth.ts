@@ -2,6 +2,9 @@ import { apiClient, clearTokens, setTokens } from './client'
 import type { AuthResponse, MessageResponse, TokenPairResponse, User } from '@/types'
 
 export const authApi = {
+  signup: (data: { full_name: string; email: string; phone?: string }) =>
+    apiClient.post<MessageResponse>('/auth/signup', data).then((r) => r.data),
+
   requestOtp: (email: string) =>
     apiClient.post<MessageResponse>('/auth/request-otp', { email }).then((r) => r.data),
 

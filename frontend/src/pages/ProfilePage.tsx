@@ -7,7 +7,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 
 export default function ProfilePage() {
   useDocumentTitle('Profile')
-  const { user, logout, isAdmin } = useAuth()
+  const { user, logout, isAdmin, isStaff } = useAuth()
   const navigate = useNavigate()
 
   const handleLogout = async () => {
@@ -45,6 +45,11 @@ export default function ProfilePage() {
             Admin
           </p>
         )}
+        {!isAdmin && user.roles.includes('MANAGER') && (
+          <p className="mt-2 inline-flex rounded-full bg-rose-light/40 px-3 py-0.5 text-xs font-medium text-rose-dark">
+            Manager
+          </p>
+        )}
         {!user.email_verified && (
           <p className="mt-2 text-sm text-amber-600">Email not verified</p>
         )}
@@ -58,13 +63,13 @@ export default function ProfilePage() {
           <Package className="h-5 w-5 text-rose" />
           <span>My Orders</span>
         </Link>
-        {isAdmin && (
+        {isStaff && (
           <Link
             to="/admin"
             className="flex items-center gap-3 rounded-xl border border-rose/15 bg-white p-4 transition hover:bg-rose-light/10"
           >
             <Shield className="h-5 w-5 text-rose" />
-            <span>Admin Dashboard</span>
+            <span>{isAdmin ? 'Admin' : 'Manager'} Dashboard</span>
           </Link>
         )}
       </div>
