@@ -9,10 +9,6 @@ import { ProtectedRoute, AdminRoute, GuestRoute } from './ProtectedRoute'
 const SplashPage = lazy(() => import('@/pages/SplashPage'))
 const WelcomePage = lazy(() => import('@/pages/WelcomePage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
-const SignupPage = lazy(() => import('@/pages/SignupPage'))
-const VerifyOTPPage = lazy(() => import('@/pages/VerifyOTPPage'))
-const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'))
-const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'))
 const HomePage = lazy(() => import('@/pages/HomePage'))
 const ShopPage = lazy(() => import('@/pages/ShopPage'))
 const ProductDetailPage = lazy(() => import('@/pages/ProductDetailPage'))
@@ -54,10 +50,6 @@ export const router = createBrowserRouter([
     element: <AuthLayout />,
     children: [
       { path: '/login', element: <SuspenseWrap><GuestRoute><LoginPage /></GuestRoute></SuspenseWrap> },
-      { path: '/signup', element: <SuspenseWrap><GuestRoute><SignupPage /></GuestRoute></SuspenseWrap> },
-      { path: '/verify-otp', element: <SuspenseWrap><VerifyOTPPage /></SuspenseWrap> },
-      { path: '/forgot-password', element: <SuspenseWrap><ForgotPasswordPage /></SuspenseWrap> },
-      { path: '/reset-password', element: <SuspenseWrap><ResetPasswordPage /></SuspenseWrap> },
     ],
   },
 

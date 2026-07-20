@@ -13,12 +13,12 @@ from app.models.inventory import Inventory
 from app.models.order import Order
 from app.models.payment import Payment
 from app.models.user import User
+from app.schemas.auth import CreateUserIn
 from app.schemas.catalog import CategoryIn, CategoryOut, ProductIn, ProductOut
 from app.schemas.common import MessageOut, Page
 from app.services.catalog import CatalogService
 from app.services.payments import ManualUPIPaymentService
 from app.services.storage import get_storage
-
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_csrf), Depends(require_admin)])
 
 
@@ -243,6 +243,35 @@ async def list_customers(db: AsyncSession = Depends(get_db), _: User = Depends(r
             }
         )
     return out
+
+
+@router.post("/customers")
+async def create_customer(
+    payload: CreateUserIn,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    from app.services.auth import AuthService
+
+    try:
+        user = await AuthService(db).create_user(
+            email=payload.email,
+            full_name=payload.full_name,
+            phone=payload.phone,
+            is_admin=payload.is_admin,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "id": user.id,
+        "full_name": user.full_name,
+        "email": user.email,
+        "phone": user.phone,
+        "email_verified": user.email_verified,
+        "created_at": user.created_at,
+        "order_count": 0,
+        "roles": [ur.role.name for ur in user.roles if ur.role],
+    }
 
 
 @router.get("/orders")

@@ -1,45 +1,25 @@
 import argparse
 import asyncio
-import getpass
 import sys
 
 from sqlalchemy import select
 
-from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
-from app.models.enums import UserRoleName
 from app.models.settings import StoreSettings
-from app.models.user import Role, User, UserRole
 from app.services.auth import AuthService
 
 
-async def create_admin(email: str, full_name: str, password: str) -> None:
+async def create_admin(email: str, full_name: str) -> None:
     async with AsyncSessionLocal() as db:
-        await AuthService(db).ensure_roles()
-        existing = await db.scalar(select(User).where(User.email == email.lower()))
-        if existing:
-            print("User already exists; promoting to admin if needed.")
-            user = existing
-        else:
-            user = User(
-                email=email.lower().strip(),
-                full_name=full_name.strip(),
-                password_hash=hash_password(password),
-                email_verified=True,
-            )
-            db.add(user)
-            await db.flush()
-        admin_role = await db.scalar(select(Role).where(Role.name == UserRoleName.ADMIN.value))
-        customer_role = await db.scalar(select(Role).where(Role.name == UserRoleName.CUSTOMER.value))
-        existing_roles = {ur.role_id for ur in (await db.scalars(select(UserRole).where(UserRole.user_id == user.id)))}
-        if admin_role and admin_role.id not in existing_roles:
-            db.add(UserRole(user_id=user.id, role_id=admin_role.id))
-        if customer_role and customer_role.id not in existing_roles:
-            db.add(UserRole(user_id=user.id, role_id=customer_role.id))
+        user = await AuthService(db).create_user(
+            email=email,
+            full_name=full_name,
+            is_admin=True,
+        )
         settings = await db.scalar(select(StoreSettings).limit(1))
         if not settings:
             db.add(StoreSettings())
-        await db.commit()
+            await db.commit()
         print(f"Admin ready: {user.email}")
 
 
@@ -49,6 +29,7 @@ async def seed_demo() -> None:
     from app.models.catalog import Category, Product
     from app.models.enums import ProductStatus
     from app.models.inventory import Inventory
+    from app.models.settings import StoreSettings
 
     async with AsyncSessionLocal() as db:
         settings = await db.scalar(select(StoreSettings).limit(1))
@@ -108,18 +89,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="SBTB management commands")
     sub = parser.add_subparsers(dest="command", required=True)
     admin_parser = sub.add_parser("create-admin")
-    admin_parser.add_argument("--email")
+    admin_parser.add_argument("--email", required=True)
     admin_parser.add_argument("--name", default="Store Admin")
-    admin_parser.add_argument("--password")
     sub.add_parser("seed")
     args = parser.parse_args()
     if args.command == "create-admin":
-        email = args.email or input("Admin email: ").strip()
-        password = args.password or getpass.getpass("Admin password: ")
-        if len(password) < 8:
-            print("Password must be at least 8 characters")
+        try:
+            asyncio.run(create_admin(args.email, args.name))
+        except ValueError as exc:
+            print(str(exc))
             sys.exit(1)
-        asyncio.run(create_admin(email, args.name, password))
     elif args.command == "seed":
         asyncio.run(seed_demo())
 

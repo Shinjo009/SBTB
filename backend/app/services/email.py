@@ -79,9 +79,17 @@ class ResendEmailService(EmailService):
 
 def get_email_service() -> EmailService:
     settings = get_settings()
+    if not settings.email_enabled:
+        return _NoopEmailService()
     if settings.resend_api_key.strip():
         return ResendEmailService()
     return SMTPEmailService()
+
+
+class _NoopEmailService(EmailService):
+    def send(self, *, to: str, subject: str, html: str, text: str | None = None) -> bool:
+        logger.info("EMAIL_ENABLED=false; skipped email to %s (%s)", to, subject)
+        return False
 
 
 def branded_email(title: str, body_html: str) -> str:

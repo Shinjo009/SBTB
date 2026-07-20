@@ -115,14 +115,11 @@ export default function WelcomePage() {
               size="lg"
               className="!block w-full border-2 border-rose/35 bg-white/85 py-2.5"
             >
-              Sign In
+              Sign In with email code
             </Button>
           </Link>
           <p className="mt-3 text-center text-xs text-ink/55">
-            New here?{' '}
-            <Link to="/signup" className="font-semibold text-rose-dark underline-offset-2 hover:underline">
-              Create an account
-            </Link>
+            Need an account? Ask the store admin to invite your email.
           </p>
         </div>
       </motion.div>

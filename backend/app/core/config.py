@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 14
     otp_expire_minutes: int = 10
     payment_window_minutes: int = 20
+    email_enabled: bool = True
 
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587

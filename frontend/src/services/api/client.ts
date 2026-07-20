@@ -1,46 +1,55 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
-import { getCookie } from '@/lib/utils'
 
-const MUTATING = new Set(['post', 'put', 'patch', 'delete'])
+const ACCESS_KEY = 'sbtb_access_token'
+const REFRESH_KEY = 'sbtb_refresh_token'
 
-let csrfToken: string | null = null
+export function getAccessToken() {
+  return localStorage.getItem(ACCESS_KEY)
+}
+
+export function getRefreshToken() {
+  return localStorage.getItem(REFRESH_KEY)
+}
+
+export function setTokens(access: string, refresh: string) {
+  localStorage.setItem(ACCESS_KEY, access)
+  localStorage.setItem(REFRESH_KEY, refresh)
+}
+
+export function clearTokens() {
+  localStorage.removeItem(ACCESS_KEY)
+  localStorage.removeItem(REFRESH_KEY)
+}
+
 let refreshPromise: Promise<string | null> | null = null
 
-export function setCsrfToken(token: string | null) {
-  csrfToken = token
-}
-
-export function getCsrfToken() {
-  return csrfToken ?? getCookie('csrf_token')
-}
-
 async function refreshSession(): Promise<string | null> {
+  const refresh = getRefreshToken()
+  if (!refresh) {
+    clearTokens()
+    return null
+  }
   try {
-    const { data } = await axios.post<{ user: unknown; csrf_token: string }>(
-      '/api/v1/auth/refresh',
-      {},
-      { withCredentials: true },
-    )
-    setCsrfToken(data.csrf_token)
-    return data.csrf_token
+    const { data } = await axios.post<{
+      access_token: string
+      refresh_token: string
+    }>('/api/v1/auth/refresh', { refresh_token: refresh })
+    setTokens(data.access_token, data.refresh_token)
+    return data.access_token
   } catch {
-    setCsrfToken(null)
+    clearTokens()
     return null
   }
 }
 
 export const apiClient = axios.create({
   baseURL: '/api/v1',
-  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 })
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const method = config.method?.toLowerCase()
-  if (method && MUTATING.has(method)) {
-    const token = getCsrfToken()
-    if (token) config.headers['X-CSRF-Token'] = token
-  }
+  const token = getAccessToken()
+  if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
@@ -52,14 +61,15 @@ apiClient.interceptors.response.use(
       error.response?.status === 401 &&
       config &&
       !config._retry &&
-      !config.url?.includes('/auth/login') &&
+      !config.url?.includes('/auth/request-otp') &&
+      !config.url?.includes('/auth/verify-otp') &&
       !config.url?.includes('/auth/refresh')
     ) {
       config._retry = true
       if (!refreshPromise) refreshPromise = refreshSession().finally(() => { refreshPromise = null })
       const token = await refreshPromise
       if (token) {
-        config.headers['X-CSRF-Token'] = token
+        config.headers.Authorization = `Bearer ${token}`
         return apiClient(config)
       }
     }

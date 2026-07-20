@@ -69,6 +69,9 @@ export const adminApi = {
   getCustomers: () =>
     apiClient.get<AdminCustomer[]>('/admin/customers').then((r) => r.data),
 
+  createCustomer: (data: { full_name: string; email: string; phone?: string; is_admin?: boolean }) =>
+    apiClient.post<AdminCustomer>('/admin/customers', data).then((r) => r.data),
+
   getOrders: (status?: string) =>
     apiClient
       .get<AdminOrderSummary[]>('/admin/orders', { params: status ? { status } : {} })

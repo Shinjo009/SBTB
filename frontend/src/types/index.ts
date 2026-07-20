@@ -11,7 +11,13 @@ export interface User {
 
 export interface AuthResponse {
   user: User
-  csrf_token: string
+}
+
+export interface TokenPairResponse {
+  access_token: string
+  refresh_token: string
+  token_type: string
+  user: User
 }
 
 export interface MessageResponse {

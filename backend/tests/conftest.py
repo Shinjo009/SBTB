@@ -6,7 +6,6 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.core.security import hash_password
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
@@ -53,8 +52,9 @@ async def customer(db_session: AsyncSession) -> User:
     user = User(
         email="customer@example.com",
         full_name="Test Customer",
-        password_hash=hash_password("Password123!"),
+        password_hash=None,
         email_verified=True,
+        is_active=True,
     )
     db_session.add(user)
     await db_session.flush()

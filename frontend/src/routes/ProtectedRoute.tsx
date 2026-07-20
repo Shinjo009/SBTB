@@ -18,10 +18,6 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
   }
 
-  if (!user.email_verified) {
-    return <Navigate to="/verify-otp" state={{ email: user.email }} replace />
-  }
-
   return <>{children}</>
 }
 
@@ -59,7 +55,7 @@ export function GuestRoute({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (user?.email_verified) {
+  if (user) {
     return <Navigate to="/home" replace />
   }
 

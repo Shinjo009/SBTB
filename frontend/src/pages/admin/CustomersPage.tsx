@@ -1,20 +1,72 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminApi } from '@/services/api/admin'
 import { Badge } from '@/components/ui/Badge'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { useToast } from '@/components/ui/Toast'
+import { getErrorMessage } from '@/services/api/client'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { formatDate } from '@/lib/utils'
 
 export default function AdminCustomersPage() {
   useDocumentTitle('Admin Customers')
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
 
   const { data: customers, isLoading } = useQuery({
     queryKey: ['admin', 'customers'],
     queryFn: adminApi.getCustomers,
   })
 
+  const createMutation = useMutation({
+    mutationFn: () =>
+      adminApi.createCustomer({
+        full_name: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.trim() || undefined,
+      }),
+    onSuccess: () => {
+      toast('Customer created — they can sign in with an email OTP', 'success')
+      setFullName('')
+      setEmail('')
+      setPhone('')
+      queryClient.invalidateQueries({ queryKey: ['admin', 'customers'] })
+    },
+    onError: (err) => toast(getErrorMessage(err), 'error'),
+  })
+
   return (
     <div>
       <h1 className="font-display text-2xl font-semibold">Customers</h1>
+      <p className="mt-1 text-sm text-ink/60">
+        Create users here. They sign in with a 6-digit email code (no password).
+      </p>
+
+      <form
+        className="mt-6 grid gap-3 rounded-2xl border border-rose/15 bg-white p-4 sm:grid-cols-4"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!fullName.trim() || !email.trim()) {
+            toast('Name and email are required', 'error')
+            return
+          }
+          createMutation.mutate()
+        }}
+      >
+        <Input label="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Input label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <div className="flex items-end">
+          <Button type="submit" loading={createMutation.isPending} className="w-full">
+            Add customer
+          </Button>
+        </div>
+      </form>
+
       <div className="mt-6 overflow-x-auto rounded-2xl border border-rose/15 bg-white">
         <table className="w-full text-sm">
           <thead>
@@ -37,7 +89,7 @@ export default function AdminCustomersPage() {
                 <td className="p-3 text-ink/60">{formatDate(c.created_at)}</td>
                 <td className="p-3">
                   <Badge variant={c.email_verified ? 'success' : 'warning'}>
-                    {c.email_verified ? 'Verified' : 'Unverified'}
+                    {c.email_verified ? 'Active' : 'Pending'}
                   </Badge>
                 </td>
               </tr>
