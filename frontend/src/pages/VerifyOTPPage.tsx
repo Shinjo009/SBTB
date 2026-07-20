@@ -10,26 +10,18 @@ import { cn, prefersReducedMotion } from '@/lib/utils'
 
 export default function VerifyOTPPage() {
   useDocumentTitle('Verify Email')
-  const { state } = useLocation() as { state?: { email?: string; otp?: string } }
+  const { state } = useLocation() as { state?: { email?: string } }
   const email = state?.email ?? ''
-  const fallbackOtp = state?.otp ?? ''
   const navigate = useNavigate()
   const { toast } = useToast()
   const [digits, setDigits] = useState(['', '', '', '', '', ''])
   const [loading, setLoading] = useState(false)
   const [countdown, setCountdown] = useState(60)
-  const [shownOtp, setShownOtp] = useState(fallbackOtp)
   const inputs = useRef<(HTMLInputElement | null)[]>([])
 
   useEffect(() => {
     if (!email) navigate('/signup', { replace: true })
   }, [email, navigate])
-
-  useEffect(() => {
-    if (fallbackOtp && /^\d{6}$/.test(fallbackOtp)) {
-      setDigits(fallbackOtp.split(''))
-    }
-  }, [fallbackOtp])
 
   useEffect(() => {
     if (countdown <= 0) return
@@ -86,15 +78,8 @@ export default function VerifyOTPPage() {
 
   const handleResend = async () => {
     try {
-      const res = await authApi.resendOtp(email)
-      if (res.otp) {
-        setShownOtp(res.otp)
-        setDigits(res.otp.split(''))
-        toast('Use the code shown on this screen', 'success')
-      } else {
-        setShownOtp('')
-        toast('OTP sent again', 'success')
-      }
+      await authApi.resendOtp(email)
+      toast('OTP sent again — check your email', 'success')
       setCountdown(60)
     } catch (err) {
       toast(getErrorMessage(err), 'error')
@@ -104,17 +89,7 @@ export default function VerifyOTPPage() {
   return (
     <div className="text-center">
       <h1 className="font-display text-2xl font-semibold">Verify your email</h1>
-      <p className="mt-2 text-sm text-ink/60">
-        {shownOtp
-          ? `Email delivery is unavailable on free hosting. Your code for ${email}:`
-          : `We sent a 6-digit code to ${email}`}
-      </p>
-
-      {shownOtp ? (
-        <p className="mt-3 font-mono text-2xl font-semibold tracking-[0.35em] text-rose-dark">
-          {shownOtp}
-        </p>
-      ) : null}
+      <p className="mt-2 text-sm text-ink/60">We sent a 6-digit code to {email}</p>
 
       <div className="mt-8 flex justify-center gap-2" onPaste={handlePaste}>
         {digits.map((d, i) => (

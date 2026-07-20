@@ -16,7 +16,6 @@ export interface AuthResponse {
 
 export interface MessageResponse {
   message: string
-  otp?: string | null
 }
 
 export interface ProductImage {

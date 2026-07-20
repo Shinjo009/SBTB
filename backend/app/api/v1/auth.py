@@ -26,16 +26,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def signup(payload: SignupIn, request: Request, db: AsyncSession = Depends(get_db)) -> MessageOut:
     await rate_limit(request, key="signup", limit=10, window_seconds=3600)
     try:
-        fallback_otp = await AuthService(db).signup(
+        await AuthService(db).signup(
             full_name=payload.full_name, email=payload.email, password=payload.password
         )
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to create account")
-    if fallback_otp:
-        return MessageOut(
-            message="Account created. Email delivery is unavailable — use the code shown on screen.",
-            otp=fallback_otp,
-        )
+    except ValueError as exc:
+        detail = str(exc) if "email" in str(exc).lower() else "Unable to create account"
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail) from exc
     return MessageOut(message="Account created. Check your email for a verification code.")
 
 
@@ -53,14 +49,14 @@ async def verify_email(payload: OTPVerifyIn, request: Request, db: AsyncSession 
 async def resend_otp(payload: ResendOTPIn, request: Request) -> MessageOut:
     await rate_limit(request, key="otp_resend", limit=10, window_seconds=3600)
     try:
-        fallback_otp = await OTPService().issue(email=payload.email, purpose="verify")
+        await OTPService().issue(email=payload.email, purpose="verify")
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
-    if fallback_otp:
-        return MessageOut(
-            message="Email delivery is unavailable — use the code shown on screen.",
-            otp=fallback_otp,
+        status_code = (
+            status.HTTP_429_TOO_MANY_REQUESTS
+            if "wait" in str(exc).lower()
+            else status.HTTP_400_BAD_REQUEST
         )
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return MessageOut(message="If the account exists, a new code was sent.")
 
 

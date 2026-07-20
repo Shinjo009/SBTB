@@ -42,6 +42,8 @@ services:
       # Set these three in the Render dashboard (not committed):
       - key: SMTP_APP_PASSWORD
         sync: false
+      - key: RESEND_API_KEY
+        sync: false
       - key: FRONTEND_URL
         sync: false
       - key: CORS_ORIGINS
