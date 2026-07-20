@@ -8,17 +8,18 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import require_admin, require_csrf, require_staff, user_role_names
 from app.db.session import get_db
-from app.models.enums import OrderStatus, PaymentStatus
+from app.models.enums import OrderStatus, PaymentStatus, UserRoleName
 from app.models.inventory import Inventory
 from app.models.order import Order
 from app.models.payment import Payment
-from app.models.user import User
+from app.models.user import AuthSession, Role, User, UserRole
 from app.schemas.auth import CreateUserIn, InviteTeamIn
 from app.schemas.catalog import CategoryIn, CategoryOut, ProductIn, ProductOut
 from app.schemas.common import MessageOut, Page
 from app.services.catalog import CatalogService
 from app.services.payments import ManualUPIPaymentService
 from app.services.storage import get_storage
+
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_csrf), Depends(require_staff)])
 
 
@@ -227,7 +228,13 @@ async def decline_payment(
 
 @router.get("/customers")
 async def list_customers(db: AsyncSession = Depends(get_db), _: User = Depends(require_staff)):
-    users = await db.scalars(select(User).order_by(User.created_at.desc()).limit(200))
+    users = await db.scalars(
+        select(User)
+        .options(selectinload(User.roles).selectinload(UserRole.role))
+        .where(User.is_active.is_(True))
+        .order_by(User.created_at.desc())
+        .limit(200)
+    )
     out = []
     for user in users:
         order_count = await db.scalar(select(func.count()).select_from(Order).where(Order.user_id == user.id))
@@ -240,6 +247,7 @@ async def list_customers(db: AsyncSession = Depends(get_db), _: User = Depends(r
                 "email_verified": user.email_verified,
                 "created_at": user.created_at,
                 "order_count": order_count or 0,
+                "roles": user_role_names(user),
             }
         )
     return out
@@ -275,11 +283,47 @@ async def create_customer(
     }
 
 
+@router.delete("/customers/{user_id}", response_model=MessageOut)
+async def delete_customer(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    staff: User = Depends(require_staff),
+):
+    from datetime import UTC, datetime
+
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.roles).selectinload(UserRole.role))
+        .where(User.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    if user.id == staff.id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+    roles = set(user_role_names(user))
+    if roles.intersection({UserRoleName.ADMIN.value, UserRoleName.MANAGER.value}):
+        raise HTTPException(status_code=400, detail="Staff accounts cannot be deleted from Customers")
+
+    order_count = await db.scalar(select(func.count()).select_from(Order).where(Order.user_id == user.id)) or 0
+    sessions = await db.scalars(select(AuthSession).where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None)))
+    now = datetime.now(UTC)
+    for session in sessions:
+        session.revoked_at = now
+
+    if order_count > 0:
+        # Orders reference users with RESTRICT — deactivate instead of hard delete
+        user.is_active = False
+        await db.commit()
+        return MessageOut(message="Customer deactivated (has order history)")
+
+    await db.delete(user)
+    await db.commit()
+    return MessageOut(message="Customer deleted")
+
+
 @router.get("/team")
 async def list_team(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
-    from app.models.enums import UserRoleName
-    from app.models.user import Role, UserRole
-
     staff_roles = await db.scalars(
         select(Role).where(Role.name.in_([UserRoleName.ADMIN.value, UserRoleName.MANAGER.value]))
     )

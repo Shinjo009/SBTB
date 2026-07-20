@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Trash2 } from 'lucide-react'
 import { adminApi } from '@/services/api/admin'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -8,6 +9,10 @@ import { useToast } from '@/components/ui/Toast'
 import { getErrorMessage } from '@/services/api/client'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle'
 import { formatDate } from '@/lib/utils'
+
+function isStaffCustomer(roles?: string[]) {
+  return Boolean(roles?.some((r) => r === 'ADMIN' || r === 'MANAGER'))
+}
 
 export default function AdminCustomersPage() {
   useDocumentTitle('Admin Customers')
@@ -37,6 +42,15 @@ export default function AdminCustomersPage() {
       setEmail('')
       setPhone('')
       setPassword('')
+      queryClient.invalidateQueries({ queryKey: ['admin', 'customers'] })
+    },
+    onError: (err) => toast(getErrorMessage(err), 'error'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: adminApi.deleteCustomer,
+    onSuccess: (res) => {
+      toast(res.message || 'Customer deleted', 'info')
       queryClient.invalidateQueries({ queryKey: ['admin', 'customers'] })
     },
     onError: (err) => toast(getErrorMessage(err), 'error'),
@@ -80,12 +94,13 @@ export default function AdminCustomersPage() {
               <th className="p-3">Orders</th>
               <th className="p-3">Joined</th>
               <th className="p-3">Status</th>
+              <th className="p-3"> </th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={5} className="p-3 text-ink/50">Loading...</td></tr>
-            ) : customers?.map((c) => (
+              <tr><td colSpan={6} className="p-3 text-ink/50">Loading...</td></tr>
+            ) : customers?.length ? customers.map((c) => (
               <tr key={c.id} className="border-b border-rose/5">
                 <td className="p-3 font-medium">{c.full_name}</td>
                 <td className="p-3 text-ink/60">{c.email}</td>
@@ -96,8 +111,26 @@ export default function AdminCustomersPage() {
                     {c.email_verified ? 'Active' : 'Pending'}
                   </Badge>
                 </td>
+                <td className="p-3 text-right">
+                  {!isStaffCustomer(c.roles) && (
+                    <button
+                      type="button"
+                      title="Delete customer"
+                      disabled={deleteMutation.isPending}
+                      onClick={() => {
+                        if (!window.confirm(`Delete account for ${c.email}?`)) return
+                        deleteMutation.mutate(c.id)
+                      }}
+                      className="text-red-400 hover:text-red-600 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </td>
               </tr>
-            ))}
+            )) : (
+              <tr><td colSpan={6} className="p-3 text-ink/50">No customers yet</td></tr>
+            )}
           </tbody>
         </table>
       </div>

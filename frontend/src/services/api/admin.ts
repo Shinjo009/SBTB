@@ -72,6 +72,9 @@ export const adminApi = {
   createCustomer: (data: { full_name: string; email: string; phone?: string; password: string }) =>
     apiClient.post<AdminCustomer>('/admin/customers', data).then((r) => r.data),
 
+  deleteCustomer: (id: string) =>
+    apiClient.delete<MessageResponse>(`/admin/customers/${id}`).then((r) => r.data),
+
   getTeam: () =>
     apiClient
       .get<{ id: string; full_name: string; email: string; roles: string[]; is_active: boolean; created_at: string }[]>(

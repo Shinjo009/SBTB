@@ -232,6 +232,7 @@ export interface AdminCustomer {
   email_verified: boolean
   created_at: string
   order_count: number
+  roles?: string[]
 }
 
 export interface AdminOrderSummary {
